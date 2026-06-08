@@ -38,3 +38,24 @@ build/
 ### Mac OS ###
 .DS_Store
 .idea/
+.allure/
+.allure-results
+# Папка локальных отчетов Allure (исправление текущего замечания)
+.allure/
+allure-results/
+allure-report/
+
+# Результаты сборки Maven (папка с компилированным кодом и отчетами JaCoCo)
+target/
+
+# Настройки среды разработки IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Системные файлы ОС (для Mac и Windows)
+.DS_Store
+Thumbs.db
+
