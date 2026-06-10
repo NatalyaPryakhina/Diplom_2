@@ -1,0 +1,101 @@
+package api;
+
+import api.client.OrderClient;
+import api.client.UserClient;
+import api.model.OrderRequest;
+import api.model.User;
+import io.qameta.allure.Description;
+import io.qameta.allure.junit4.DisplayName;
+import io.restassured.response.Response;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import java.util.ArrayList;
+import java.util.List;
+import static org.apache.http.HttpStatus.*;
+import static org.hamcrest.Matchers.*;
+
+public class CreateOrderTest {
+    private OrderClient orderClient;
+    private UserClient userClient;
+    private String accessToken;
+    private List<String> validIngredients;
+
+    @Before
+    public void setUp() {
+        orderClient = new OrderClient();
+        userClient = new UserClient();
+        validIngredients = new ArrayList<>();
+
+        // Получаем ID ингредиента напрямую через метод клиента
+        String ingredientId = orderClient.getFirstIngredientId();
+        validIngredients.add(ingredientId);
+
+        String uniqueId = String.valueOf(System.currentTimeMillis());
+        User user = User.builder()
+                .email("order_user_" + uniqueId + "@yandex.ru")
+                .password("pass123")
+                .name("Natalya")
+                .build();
+
+        Response registerResponse = userClient.createUser(user);
+        registerResponse.then().statusCode(SC_OK);
+        accessToken = registerResponse.path("accessToken");
+    }
+
+
+    @After
+    public void tearDown() {
+        if (accessToken != null && !accessToken.isEmpty()) {
+            userClient.deleteUser(accessToken);
+        }
+    }
+
+    @Test
+    @DisplayName("Создание заказа с авторизацией")
+    @Description("Успешное создание заказа авторизованным в системе пользователем с ингредиентами")
+    public void testCreateOrderWithAuthSuccess() {
+        OrderRequest orderRequest = new OrderRequest(validIngredients);
+        Response response = orderClient.createOrder(orderRequest, accessToken);
+
+        response.then().statusCode(SC_OK)
+                .body("success", is(true))
+                .body("order.number", notNullValue());
+    }
+
+    @Test
+    @DisplayName("Создание заказа без авторизации")
+    @Description("Проверка поведения системы при создании заказа неавторизованным пользователем")
+    public void testCreateOrderWithoutAuthFail() {
+        OrderRequest orderRequest = new OrderRequest(validIngredients);
+        Response response = orderClient.createOrder(orderRequest, "");
+
+        response.then().statusCode(SC_OK)
+                .body("success", is(true));
+    }
+
+    @Test
+    @DisplayName("Создание заказа без ингредиентов")
+    @Description("Возврат ошибки 400 Bad Request при передаче пустого списка ингредиентов")
+    public void testCreateOrderWithoutIngredientsFail() {
+        OrderRequest orderRequest = new OrderRequest(new ArrayList<>());
+        Response response = orderClient.createOrder(orderRequest, accessToken);
+
+        response.then().statusCode(SC_BAD_REQUEST)
+                .body("success", is(false))
+                .body("message", equalTo("Ingredient ids must be provided"));
+    }
+
+    @Test
+    @DisplayName("Создание заказа с неверным хешем ингредиентов")
+    @Description("Возврат ошибки 500 Internal Server Error при использовании невалидного хэша")
+    public void testCreateOrderWithInvalidHashFail() {
+        List<String> invalidIngredients = new ArrayList<>();
+        invalidIngredients.add("invalid_hash_value_12345");
+
+        OrderRequest orderRequest = new OrderRequest(invalidIngredients);
+        Response response = orderClient.createOrder(orderRequest, accessToken);
+
+        response.then().statusCode(SC_INTERNAL_SERVER_ERROR);
+    }
+}
