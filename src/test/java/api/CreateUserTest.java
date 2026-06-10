@@ -2,7 +2,6 @@ package api;
 
 import api.client.UserClient;
 import api.model.User;
-import api.model.UserCredentials;
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
 import io.restassured.response.Response;
@@ -12,7 +11,7 @@ import org.junit.Test;
 import static org.apache.http.HttpStatus.*;
 import static org.hamcrest.Matchers.*;
 
-public class UserApiTest {
+public class CreateUserTest {
     private UserClient userClient;
     private String accessToken;
 
@@ -40,9 +39,10 @@ public class UserApiTest {
                 .build();
 
         Response response = userClient.createUser(user);
+        response.then().statusCode(SC_OK);
         accessToken = response.path("accessToken");
 
-        response.then().statusCode(SC_OK)
+        response.then()
                 .body("success", is(true))
                 .body("user.email", equalTo(user.getEmail().toLowerCase()));
     }
@@ -59,6 +59,7 @@ public class UserApiTest {
                 .build();
 
         Response response1 = userClient.createUser(user);
+        response1.then().statusCode(SC_OK);
         accessToken = response1.path("accessToken");
 
         Response response2 = userClient.createUser(user);
@@ -115,65 +116,5 @@ public class UserApiTest {
         response.then().statusCode(SC_FORBIDDEN)
                 .body("success", is(false))
                 .body("message", equalTo("Email, password and name are required fields"));
-    }
-
-    @Test
-    @DisplayName("Логин под существующим пользователем")
-    @Description("Успешный вход в систему с валидными данными")
-    public void testLoginExistingUserSuccess() {
-        String uniqueId = String.valueOf(System.currentTimeMillis());
-        User user = User.builder()
-                .email("login_" + uniqueId + "@yandex.ru")
-                .password("pass1234")
-                .name("Natalya")
-                .build();
-
-        Response createResponse = userClient.createUser(user);
-        accessToken = createResponse.path("accessToken");
-
-        Response loginResponse = userClient.loginUser(UserCredentials.from(user));
-        loginResponse.then().statusCode(SC_OK)
-                .body("success", is(true))
-                .body("accessToken", notNullValue());
-    }
-
-    @Test
-    @DisplayName("Логин с неверным логином (email)")
-    @Description("Проверка возврата ошибки при попытке входа с незарегистрированным email")
-    public void testLoginWithInvalidEmailFail() {
-        UserCredentials badCredentials = UserCredentials.builder()
-                .email("not_exists_user_123@yandex.ru")
-                .password("pass1234")
-                .build();
-
-        Response response = userClient.loginUser(badCredentials);
-        response.then().statusCode(SC_UNAUTHORIZED)
-                .body("success", is(false))
-                .body("message", equalTo("email or password are incorrect"));
-    }
-
-    @Test
-    @DisplayName("Логин с неверным паролем")
-    @Description("Проверка возврата ошибки при попытке входа с невалидным паролем существующего пользователя")
-    public void testLoginWithInvalidPasswordFail() {
-        String uniqueId = String.valueOf(System.currentTimeMillis());
-        User user = User.builder()
-                .email("login_bad_pass_" + uniqueId + "@yandex.ru")
-                .password("pass1234")
-                .name("Natalya")
-                .build();
-
-        Response createResponse = userClient.createUser(user);
-        accessToken = createResponse.path("accessToken");
-
-        UserCredentials badCredentials = UserCredentials.builder()
-                .email(user.getEmail())
-                .password("wrong_password_999")
-                .build();
-
-        Response response = userClient.loginUser(badCredentials);
-        response.then().statusCode(SC_UNAUTHORIZED)
-                .body("success", is(false))
-                .body("message", equalTo("email or password are incorrect"));
     }
 }

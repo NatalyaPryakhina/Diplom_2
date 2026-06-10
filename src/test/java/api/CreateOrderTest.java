@@ -15,7 +15,7 @@ import java.util.List;
 import static org.apache.http.HttpStatus.*;
 import static org.hamcrest.Matchers.*;
 
-public class OrderApiTest {
+public class CreateOrderTest {
     private OrderClient orderClient;
     private UserClient userClient;
     private String accessToken;
@@ -27,19 +27,9 @@ public class OrderApiTest {
         userClient = new UserClient();
         validIngredients = new ArrayList<>();
 
-
-        Response ingredientsResponse = orderClient.getIngredients();
-        if (ingredientsResponse.statusCode() == SC_OK) {
-            String dynamicHash = ingredientsResponse.path("data[0]._id");
-            if (dynamicHash != null && !dynamicHash.isEmpty()) {
-                validIngredients.add(dynamicHash);
-            } else {
-                validIngredients.add("60d3b41abdacab0026a733c6");
-            }
-        } else {
-            validIngredients.add("60d3b41abdacab0026a733c6");
-        }
-
+        // Получаем ID ингредиента напрямую через метод клиента
+        String ingredientId = orderClient.getFirstIngredientId();
+        validIngredients.add(ingredientId);
 
         String uniqueId = String.valueOf(System.currentTimeMillis());
         User user = User.builder()
@@ -49,10 +39,10 @@ public class OrderApiTest {
                 .build();
 
         Response registerResponse = userClient.createUser(user);
-        if (registerResponse.statusCode() == SC_OK) {
-            accessToken = registerResponse.path("accessToken");
-        }
+        registerResponse.then().statusCode(SC_OK);
+        accessToken = registerResponse.path("accessToken");
     }
+
 
     @After
     public void tearDown() {
@@ -78,7 +68,6 @@ public class OrderApiTest {
     @Description("Проверка поведения системы при создании заказа неавторизованным пользователем")
     public void testCreateOrderWithoutAuthFail() {
         OrderRequest orderRequest = new OrderRequest(validIngredients);
-
         Response response = orderClient.createOrder(orderRequest, "");
 
         response.then().statusCode(SC_OK)
@@ -106,7 +95,6 @@ public class OrderApiTest {
 
         OrderRequest orderRequest = new OrderRequest(invalidIngredients);
         Response response = orderClient.createOrder(orderRequest, accessToken);
-
 
         response.then().statusCode(SC_INTERNAL_SERVER_ERROR);
     }
